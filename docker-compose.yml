@@ -1,0 +1,70 @@
+name: mindbet-prediction-market
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-mindbet_prediction_market}
+      MYSQL_USER: ${MYSQL_USER:-mindbet_prediction_market}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-replace-with-local-password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-replace-with-local-root-password}
+    ports:
+      - "${MYSQL_PORT:-13307}:3306"
+    volumes:
+      - mindbet-prediction-market-mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mindbet-prediction-market
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-16379}:6379"
+    volumes:
+      - mindbet-prediction-market-redis-data:/data
+    networks:
+      - mindbet-prediction-market
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-nginx:1.27-alpine}
+    profiles: ["app"]
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3400}:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+    networks:
+      - mindbet-prediction-market
+
+  api:
+    image: ${API_IMAGE:-nginx:1.27-alpine}
+    profiles: ["app"]
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8188}:80"
+    networks:
+      - mindbet-prediction-market
+
+networks:
+  mindbet-prediction-market:
+    name: mindbet-prediction-market-network
+    driver: bridge
+
+volumes:
+  mindbet-prediction-market-mysql-data:
+    name: mindbet-prediction-market-mysql-data
+  mindbet-prediction-market-redis-data:
+    name: mindbet-prediction-market-redis-data
